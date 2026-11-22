@@ -30,6 +30,41 @@ export function cmd(ed: HTMLElement, c: string, v?: string) {
   restore(ed);
   document.execCommand(c, false, v ?? undefined);
 }
+/**
+ * Highlights the current selection (or clears it with 'transparent') and leaves the caret
+ * AFTER it. Chrome always types inside the style the caret sits in, so without this anything
+ * typed right after a highlight would be highlighted too. An invisible zero-width space after
+ * the highlight gives the caret somewhere outside it; it is stripped when saving or exporting.
+ */
+export function applyHighlight(color: string) {
+  document.execCommand('hiliteColor', false, color);
+  const s = getSelection();
+  if (!s || !s.rangeCount) return;
+  if (color === 'transparent') { s.collapseToEnd(); return; }
+  const r = s.getRangeAt(0), n = r.endContainer;
+  const el = n.nodeType === 1 ? (n as Element) : n.parentElement;
+  const sp = el && el.closest('span[style*="background"]');
+  if (sp) {
+    const rest = document.createRange(); // is the selection's end the very end of the highlight?
+    rest.selectNodeContents(sp);
+    rest.setStart(r.endContainer, r.endOffset);
+    if (rest.toString() === '') {
+      const z = document.createTextNode(ZWSP);
+      sp.after(z);
+      const c = document.createRange();
+      c.setStart(z, 1);
+      c.collapse(true);
+      s.removeAllRanges();
+      s.addRange(c);
+      return;
+    }
+  }
+  s.collapseToEnd();
+}
+
+/** The zero-width space used by applyHighlight; remove it from text that is saved or exported. */
+export const ZWSP = '\u200b';
+export const stripZw = (t: string) => t.replace(/\u200b/g, '');
 
 export function setSize(ed: HTMLElement, px: number | string) {
   restore(ed);

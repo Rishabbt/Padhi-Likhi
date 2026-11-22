@@ -38,6 +38,25 @@ export function ColorMenu(p: { onFg: (c: string) => void; onBg: (c: string) => v
   );
 }
 
+export const HL_COLORS: [string, string][] = [
+  ['#fff3a3', 'Yellow'], ['#b8f5c4', 'Green'], ['#ffc9de', 'Pink'], ['#bfe3ff', 'Blue'], ['#ffd9a8', 'Orange'], ['#e3ccff', 'Purple'],
+];
+export function HlMenu({ color, onPick }: { color: string; onPick: (c: string) => void }) {
+  return (
+    <>
+      <Lb>Highlighter color</Lb>
+      <Row>
+        {HL_COLORS.map(([c, n]) => (
+          <button key={c} className={'sw' + (c.toLowerCase() === color.toLowerCase() ? ' cur' : '')} style={{ background: c }} title={n} aria-label={n} onClick={() => onPick(c)} />
+        ))}
+      </Row>
+      <Lb>Custom color</Lb>
+      <Row><input type="color" defaultValue={color} aria-label="Custom highlighter color" onChange={(e) => onPick(e.target.value)} /></Row>
+      <Lb>Pick a color, then drag over text to highlight it.</Lb>
+    </>
+  );
+}
+
 export function FmtMenu(p: { onCmd: (c: string) => void; onSize: (n: number) => void; onFont: (f: string) => void }) {
   const b = (t: ReactNode, fn: () => void, k: string) => <button key={k} onClick={fn}>{t}</button>;
   return (

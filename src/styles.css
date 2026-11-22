@@ -87,3 +87,14 @@ body.pen #layer svg.ink{pointer-events:auto;cursor:crosshair;touch-action:none}.
 /* highlighter pen: selecting text previews in the chosen highlight color */
 body.hl #editor ::selection,body.hl #editor::selection{background:var(--hl);color:inherit}
 body.hl #editor{cursor:cell}
+
+
+/* "remove highlight" button icon: a highlighted word with a strike through it */
+.hlx{background:#fff3a3;color:#1b1b1b;padding:0 3px;border-radius:2px;position:relative;font-size:13px}
+.hlx::after{content:'';position:absolute;left:-2px;right:-2px;top:50%;border-top:2px solid #c0392b;transform:rotate(-20deg)}
+body.hlc #editor{cursor:cell}
+body.hlc #editor ::selection,body.hlc #editor::selection{background:rgba(220,60,60,.28);color:inherit}
+
+/* highlighter color button: shows the current color, opens the palette */
+.swbtn{width:30px;height:30px;padding:0;border:1px solid var(--line,#c9d1cc);border-radius:6px;font-size:10px;color:#1b1b1b;line-height:1}
+#pop .sw.cur{outline:2px solid var(--accent,#1f6f5c);outline-offset:1px}

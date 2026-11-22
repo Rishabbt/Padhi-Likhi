@@ -17,10 +17,13 @@ interface Props {
   onFont: (f: string) => void;
   onSize: (n: string) => void;
   onFg: (c: string) => void;
-  hlOn: boolean;
+  /** highlighter pen: on = every selection gets highlighted */
+  hlMode: 'off' | 'mark' | 'clear';
   hlColor: string;
   onHlButton: () => void;
-  onHlColor: (c: string) => void;  onTool: (t: 'pen' | 'eraser') => void;
+  onHlMenu: (el: HTMLElement) => void;
+  onHlClear: () => void;
+  onTool: (t: 'pen' | 'eraser') => void;
   onPenColor: (c: string) => void;
   onPenWidth: (n: number) => void;
   onShape: (k: BoxKind | 'arrow') => void;
@@ -81,12 +84,15 @@ export default function Toolbar(p: Props) {
         <span className="sep" />
         {c('bold', 'Bold', <b>B</b>)}{c('italic', 'Italic', <i>I</i>)}{c('underline', 'Underline', <u>U</u>)}
         <label className="c" title="Text color">Text<input type="color" id="fc" defaultValue="#1b1b1b" onChange={(e) => p.onFg(e.target.value)} /></label>
-        <span className="c" title="Highlighter: with text selected it highlights it; otherwise it turns the highlighter on, and anything you select next is highlighted. Click again or press Esc to stop.">        
-                      <button id="hlbtn" className={p.hlOn ? 'on' : ''} aria-pressed={p.hlOn} aria-label="Highlighter" onClick={p.onHlButton}>
+        <span className="c" title="Highlighter: with text selected it highlights it; otherwise it turns the highlighter on, and anything you select next is highlighted. Click again or press Esc to stop.">
+          <button id="hlbtn" className={p.hlMode === 'mark' ? 'on' : ''} aria-pressed={p.hlMode === 'mark'} aria-label="Highlighter" onClick={p.onHlButton}>
             <Icon><path d="m9 11-6 6v3h9l3-3" /><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" /></Icon>
           </button>
-                    <input type="color" id="hc" value={p.hlColor} aria-label="Highlight color" onChange={(e) => p.onHlColor(e.target.value)} />
+          <button id="hc" className="swbtn" style={{ background: p.hlColor }} aria-label="Choose highlighter color" aria-haspopup="true" title="Choose highlighter color" onClick={(e) => p.onHlMenu(e.currentTarget)}>▾</button>
         </span>
+        <button id="hlclear" className={p.hlMode === 'clear' ? 'on' : ''} aria-pressed={p.hlMode === 'clear'} aria-label="Remove highlight"
+          title="Remove highlight: with text selected it clears the highlight; otherwise it turns the remover on, and anything you select next is cleared. Click again or press Esc to stop."
+          onClick={p.onHlClear}><span className="hlx">ab</span></button>
         <span className="sep" />
         {c('justifyLeft', 'Align left', '⇤')}{c('justifyCenter', 'Center', '↔')}{c('justifyRight', 'Align right', '⇥')}
         {c('insertUnorderedList', 'Bullets', '• List')}{c('insertOrderedList', 'Numbers', '1. List')}

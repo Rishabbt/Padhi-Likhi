@@ -26,9 +26,13 @@ export default function Popover({ anchor, editor, onClose, children }: Props) {
     }
     if (!b) return;
     pop.style.left = Math.max(8, Math.min(b.left, innerWidth - pop.offsetWidth - 8)) + 'px';
-    let t = b.bottom + 6;
-    const bar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--barH')) || 90;
-    if (t + pop.offsetHeight > innerHeight - bar - 20) t = b.top - pop.offsetHeight - 6;
+        let t = b.bottom + 6;
+    const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--barH')) || 90;
+    if (t + pop.offsetHeight > innerHeight - barH - 20) {
+      // open upwards; for buttons inside the bottom bar, stop above the whole bar, not just the button
+      const bar = anchor && anchor.closest('.bar');
+      t = (bar ? bar.getBoundingClientRect().top : b.top) - pop.offsetHeight - 8;
+    }
     pop.style.top = Math.max(8, t) + 'px';
   });
 

@@ -115,7 +115,7 @@ function buildPDF({ page: pe, editor: ed, layer, shapes, strokes, name }: PdfInp
         }
       }
       cx.font = (ital ? 'italic ' : '') + (bold ? 'bold ' : '') + fs + 'px ' + CF[fm];
-      const val = nd.nodeValue || '', re = /\S+/g;
+const val = nd.nodeValue || '', re = /[^\s\u200b]+/g;
       let m: RegExpExecArray | null;
       while ((m = re.exec(val))) {
         rg.setStart(nd, m.index);
@@ -150,7 +150,7 @@ function buildPDF({ page: pe, editor: ed, layer, shapes, strokes, name }: PdfInp
     let nd: Node | null;
     while ((nd = wk.nextNode()) && !(nd.nodeValue || '').trim());
     if (!nd) return;
-    const v = nd.nodeValue || '', rg = document.createRange(), k0 = v.search(/\S/);
+    const v = nd.nodeValue || '', rg = document.createRange(), k0 = v.search(/[^\s\u200b]/);
     rg.setStart(nd, k0);
     rg.setEnd(nd, k0 + 1);
     const rc = rg.getClientRects()[0];

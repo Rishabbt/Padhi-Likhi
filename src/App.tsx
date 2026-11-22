@@ -4,7 +4,7 @@ import type { BoxShape, LineShape, Shape, Stroke } from './types';
 import { DEFAULT_SIZE } from './lib/boxes';
 import { hx, rnd, sid, tint } from './lib/colors';
 import { PAGE_W } from './lib/pageGeometry';
-import { cmd, curCell, getSaved, insTable, setSize, tblOp, textGrad, type TableOp } from './lib/editor';
+import { applyHighlight, cmd, curCell, getSaved, insTable, restore, setSize, stripZw, tblOp, textGrad, type TableOp } from './lib/editor';
 import { exportHTML, exportTxt, readImports } from './lib/exportImport';
 import { exportPDF } from './lib/pdf';
 import type { Recognized } from './lib/geometry';
@@ -15,11 +15,11 @@ import Popover from './components/Popover';
 import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import TopBar from './components/TopBar';
-import { CMDS, ColorMenu, DocMenu, FmtMenu, FolderMenu, SaveMenu, ShapeMenu, SlashMenu, TableMenu, type SlashCmd } from './components/Menus';
+import { HlMenu, CMDS, ColorMenu, DocMenu, FmtMenu, FolderMenu, SaveMenu, ShapeMenu, SlashMenu, TableMenu, type SlashCmd } from './components/Menus';
 
 type Menu =
   | { k: 'slash'; items: SlashCmd[]; idx: number; len: number }
-  | { k: 'color' | 'fmt' | 'shape' | 'table' | 'save' }
+  | { k: 'color' | 'fmt' | 'shape' | 'table' | 'save'| 'hl'  }
   | { k: 'doc' | 'folder'; id: string };
 type UndoEntry = { k: 'p'; id: string } | { k: 's'; id: string; stroke: Stroke };
 
@@ -28,10 +28,9 @@ const HEX = /^#[0-9a-f]{6}$/i;
 export default function App() {
   const editorRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
-  const store = useDocStore(() => (editorRef.current ? editorRef.current.innerHTML : null));
+const store = useDocStore(() => (editorRef.current ? stripZw(editorRef.current.innerHTML) : null));
   const { doc, docs, folders, cur } = store;
-    const [hlOn, setHlOn] = useState(false);
-  const [hlColor, setHlColor] = useState('#fff3a3');
+  const [hlMode, setHlMode] = useState<'off' | 'mark' | 'clear'>('off');  const [hlColor, setHlColor] = useState('#fff3a3');
   const [sel, setSel] = useState<string | null>(null);
   const [snapId, setSnapId] = useState<string | null>(null);
   const [tool, setToolState] = useState<Tool>(null);
@@ -85,19 +84,21 @@ export default function App() {
   }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /* ---- highlighter pen ---- */
+    /* ---- highlighter pen (mark) and highlight remover (clear) ---- */
   useLayoutEffect(() => {
-    document.body.classList.toggle('hl', hlOn);
+    document.body.classList.toggle('hl', hlMode === 'mark');
+    document.body.classList.toggle('hlc', hlMode === 'clear');
     document.body.style.setProperty('--hl', hlColor);
-  }, [hlOn, hlColor]);
-  // While the pen is on, highlight whatever gets selected in the editor once the selection settles.
+  }, [hlMode, hlColor]);
+  // While a pen is on, apply it to whatever gets selected in the editor once the selection settles.
   useEffect(() => {
-    if (!hlOn) return;
+    if (hlMode === 'off') return;
+    const color = hlMode === 'mark' ? hlColor : 'transparent';
     let down = false, timer = 0;
     const apply = () => {
       const ed = editorRef.current, s = getSelection();
       if (!ed || !s || !s.rangeCount || s.isCollapsed || !ed.contains(s.anchorNode) || !ed.contains(s.focusNode)) return;
-      document.execCommand('hiliteColor', false, hlColor);
-      s.collapseToEnd(); // so the new color is visible instead of the selection tint
+      applyHighlight(color);
       store.markDirty();
     };
     const later = (ms: number) => { clearTimeout(timer); timer = window.setTimeout(() => { if (!down) apply(); }, ms); };
@@ -113,21 +114,29 @@ export default function App() {
       document.removeEventListener('pointerup', pu);
       document.removeEventListener('selectionchange', sc);
     };
-  }, [hlOn, hlColor]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hlMode, hlColor]); // eslint-disable-line react-hooks/exhaustive-deps
   const hasTextSelection = () => {
     const s = getSelection(), r = editorRef.current && s && s.rangeCount && editorRef.current.contains(s.anchorNode) ? s.getRangeAt(0) : getSaved();
     return !!r && !r.collapsed;
   };
+  /** highlight (or clear) the text that is selected right now */
+  const highlightSelection = (color: string) => { restore(ed()); applyHighlight(color); store.markDirty(); };
   const onHlButton = () => {
-    if (hlOn) { setHlOn(false); return; }                              // on -> off
-    if (hasTextSelection()) { doCmd('hiliteColor', hlColor); return; } // text selected -> highlight it now
-    setHlOn(true); setToolState(null);                                 // nothing selected -> pen on
+    if (hlMode === 'mark') { setHlMode('off'); return; }                    // on -> off
+    if (hasTextSelection()) { highlightSelection(hlColor); setHlMode('off'); return; } // text selected -> highlight it now
+    setHlMode('mark'); setToolState(null);                                  // nothing selected -> pen on
+  };
+  const onHlClear = () => {
+    if (hlMode === 'clear') { setHlMode('off'); return; }
+    if (hasTextSelection()) { highlightSelection('transparent'); setHlMode('off'); return; }
+    setHlMode('clear'); setToolState(null);
   };
   const onHlColor = (c: string) => {
     setHlColor(c);
-    if (hasTextSelection() && !hlOn) doCmd('hiliteColor', c);
-    else setHlOn(true);
+    if (hasTextSelection() && hlMode === 'off') highlightSelection(c);
+    else setHlMode('mark');
   };
+ 
   const closeMenu = useCallback(() => setMenu(null), []);
   const openMenu = (m: Menu, anchor: Element | null = null) => setMenu({ m, anchor });
   const ed = () => editorRef.current!;
@@ -210,7 +219,7 @@ export default function App() {
   const slashCheck = () => {
     const s = getSelection();
     if (!s || !s.rangeCount || !s.isCollapsed || !s.anchorNode || s.anchorNode.nodeType !== 3) { setMenu((m) => (m?.m.k === 'slash' ? null : m)); return; }
-    const m = (s.anchorNode.textContent || '').slice(0, s.anchorOffset).match(/(?:^|\s)\/(\w*)$/);
+    const m = (s.anchorNode.textContent || '').slice(0, s.anchorOffset).match(/(?:^|[\s\u200b])\/(\w*)$/)
     if (!m) { setMenu((x) => (x?.m.k === 'slash' ? null : x)); return; }
     const items = CMDS.filter((c) => c.k.startsWith(m[1].toLowerCase()));
     if (!items.length) { setMenu(null); return; }
@@ -256,8 +265,8 @@ export default function App() {
       } catch {
         store.setStatus('Could not create the PDF', false);
       }
-    } else if (v === 'html') download(nm + '.html', exportHTML(name, ed().innerHTML, shapes, strokes), 'text/html');
-    else if (v === 'txt') download(nm + '.txt', exportTxt(ed().innerText, shapes), 'text/plain');
+    } else if (v === 'html') download(nm + '.html', exportHTML(name, stripZw(ed().innerHTML), shapes, strokes), 'text/html');
+    else if (v === 'txt') download(nm + '.txt', exportTxt(stripZw(ed().innerText), shapes), 'text/plain');
     else download('draftboard-backup.json', JSON.stringify({ draftboard: 3, ...store.snapshot() }), 'application/json');
   };
 
@@ -291,7 +300,7 @@ export default function App() {
       const F = fns.current, S = L.current, t = e.target as HTMLElement;
       if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel && !t.isContentEditable && !/INPUT|SELECT/.test(t.tagName)) F.deleteShape(S.sel);
       if (S.tool && (e.ctrlKey || e.metaKey) && e.code === 'KeyZ') { e.preventDefault(); F.penUndo(); }
-if (e.key === 'Escape') { F.closeMenu(); setHlOn(false); if (S.tool) setToolState(null); }      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyC' || e.code === 'KeyF')) {
+if (e.key === 'Escape') { F.closeMenu(); setHlMode('off'); if (S.tool) setToolState(null); }      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyC' || e.code === 'KeyF')) {
         e.preventDefault();
         if (e.code === 'KeyC' && S.sel) { F.openMenu({ k: 'shape' }, F.shapeEl()); return; }
         if (!getSaved()) return;
@@ -326,6 +335,8 @@ if (e.key === 'Escape') { F.closeMenu(); setHlOn(false); if (S.tool) setToolStat
         return <SlashMenu items={m.items} idx={m.idx} onPick={(i) => applySlash(m.items[i], m.len)} />;
       case 'color':
         return <ColorMenu onFg={(c) => doCmd('foreColor', c)} onBg={(c) => doCmd('hiliteColor', c)} onGrad={(a, b) => { doGrad(a, b); setMenu(null); }} />;
+              case 'hl':
+        return <HlMenu color={hlColor} onPick={(c) => { onHlColor(c); setMenu(null); }} />;
       case 'fmt':
         return <FmtMenu onCmd={(c) => doCmd(c)} onSize={doSize} onFont={(f) => doCmd('fontName', f)} />;
       case 'shape':
@@ -362,8 +373,8 @@ if (e.key === 'Escape') { F.closeMenu(); setHlOn(false); if (S.tool) setToolStat
         onTheme={() => { const t = dark ? 'light' : 'dark'; setTheme(t); try { localStorage.setItem('db-theme', t); } catch { /* ignore */ } }}
         onPrint={() => { flushSync(() => setSel(null)); window.print(); }} />
       <Toolbar hasSel={!!selShape} sfValue={sfValue} tool={tool} penColor={penColor} penWidth={penWidth}
-        onCmd={(c) => doCmd(c)} onFont={(f) => doCmd('fontName', f)} onSize={doSize} onFg={(c) => doCmd('foreColor', c)} hlOn={hlOn} hlColor={hlColor} onHlButton={onHlButton} onHlColor={onHlColor}
-        onTool={(t) => { const next = tool === t ? null : t; setToolState(next); if (next) { setSel(null); setMenu(null); setHlOn(false); } }}
+        onCmd={(c) => doCmd(c)} onFont={(f) => doCmd('fontName', f)} onSize={doSize} onFg={(c) => doCmd('foreColor', c)} hlMode={hlMode} hlColor={hlColor} onHlButton={onHlButton} onHlMenu={(el) => openMenu({ k: 'hl' }, el)} onHlClear={onHlClear}
+        onTool={(t) => { const next = tool === t ? null : t; setToolState(next); if (next) { setSel(null); setMenu(null); setHlMode('off'); } }}
         onPenColor={setPenColor} onPenWidth={setPenWidth}
         onShape={(k) => (k === 'arrow' ? addArrow() : addBox(k))} onShapeFill={fillShape}
         onFront={() => selShape && store.setScene((sc) => ({ ...sc, shapes: [...sc.shapes.filter((s) => s.id !== selShape.id), selShape] }))}
