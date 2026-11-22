@@ -83,3 +83,7 @@ body.pen #layer svg.ink{pointer-events:auto;cursor:crosshair;touch-action:none}.
 @page{size:Letter;margin:0}
 @media print{:root{--gap:0px}.pagebox{width:auto!important;height:auto!important}#page{transform:none!important}.bar,.top,#side,#tbar,#dropi{display:none!important}.wrap{padding:0;margin:0!important;overflow:visible}#page{box-shadow:none}.sheet{box-shadow:none}.shape{outline:none!important}.rh{display:none!important}}
 .lbl{white-space:pre-wrap}
+
+/* highlighter pen: selecting text previews in the chosen highlight color */
+body.hl #editor ::selection,body.hl #editor::selection{background:var(--hl);color:inherit}
+body.hl #editor{cursor:cell}

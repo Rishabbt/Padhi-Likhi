@@ -17,8 +17,10 @@ interface Props {
   onFont: (f: string) => void;
   onSize: (n: string) => void;
   onFg: (c: string) => void;
-  onHighlight: (c: string) => void;
-  onTool: (t: 'pen' | 'eraser') => void;
+  hlOn: boolean;
+  hlColor: string;
+  onHlButton: () => void;
+  onHlColor: (c: string) => void;  onTool: (t: 'pen' | 'eraser') => void;
   onPenColor: (c: string) => void;
   onPenWidth: (n: number) => void;
   onShape: (k: BoxKind | 'arrow') => void;
@@ -43,7 +45,6 @@ const TABS: [Tab, string][] = [['text', 'Text'], ['insert', 'Insert'], ['draw', 
  * tabs (see the max-width:900px rules in styles.css) so the bar stays one short row.
  */
 export default function Toolbar(p: Props) {
-  const [hc, setHc] = useState('#fff3a3');
   const [tab, setTab] = useState<Tab>('text');
   const ref = useRef<HTMLDivElement>(null);
 
@@ -80,11 +81,11 @@ export default function Toolbar(p: Props) {
         <span className="sep" />
         {c('bold', 'Bold', <b>B</b>)}{c('italic', 'Italic', <i>I</i>)}{c('underline', 'Underline', <u>U</u>)}
         <label className="c" title="Text color">Text<input type="color" id="fc" defaultValue="#1b1b1b" onChange={(e) => p.onFg(e.target.value)} /></label>
-        <span className="c" title="Highlighter: click the marker to highlight, or pick a color">
-          <button id="hlbtn" aria-label="Highlight selected text" onClick={() => p.onHighlight(hc)}>
+        <span className="c" title="Highlighter: with text selected it highlights it; otherwise it turns the highlighter on, and anything you select next is highlighted. Click again or press Esc to stop.">        
+                      <button id="hlbtn" className={p.hlOn ? 'on' : ''} aria-pressed={p.hlOn} aria-label="Highlighter" onClick={p.onHlButton}>
             <Icon><path d="m9 11-6 6v3h9l3-3" /><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" /></Icon>
           </button>
-          <input type="color" id="hc" value={hc} aria-label="Highlight color" onChange={(e) => { setHc(e.target.value); p.onHighlight(e.target.value); }} />
+                    <input type="color" id="hc" value={p.hlColor} aria-label="Highlight color" onChange={(e) => p.onHlColor(e.target.value)} />
         </span>
         <span className="sep" />
         {c('justifyLeft', 'Align left', '⇤')}{c('justifyCenter', 'Center', '↔')}{c('justifyRight', 'Align right', '⇥')}

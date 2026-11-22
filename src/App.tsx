@@ -30,7 +30,8 @@ export default function App() {
   const pageRef = useRef<HTMLDivElement>(null);
   const store = useDocStore(() => (editorRef.current ? editorRef.current.innerHTML : null));
   const { doc, docs, folders, cur } = store;
-
+    const [hlOn, setHlOn] = useState(false);
+  const [hlColor, setHlColor] = useState('#fff3a3');
   const [sel, setSel] = useState<string | null>(null);
   const [snapId, setSnapId] = useState<string | null>(null);
   const [tool, setToolState] = useState<Tool>(null);
@@ -83,6 +84,50 @@ export default function App() {
     count.current = store.scene().shapes.length;
   }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    /* ---- highlighter pen ---- */
+  useLayoutEffect(() => {
+    document.body.classList.toggle('hl', hlOn);
+    document.body.style.setProperty('--hl', hlColor);
+  }, [hlOn, hlColor]);
+  // While the pen is on, highlight whatever gets selected in the editor once the selection settles.
+  useEffect(() => {
+    if (!hlOn) return;
+    let down = false, timer = 0;
+    const apply = () => {
+      const ed = editorRef.current, s = getSelection();
+      if (!ed || !s || !s.rangeCount || s.isCollapsed || !ed.contains(s.anchorNode) || !ed.contains(s.focusNode)) return;
+      document.execCommand('hiliteColor', false, hlColor);
+      s.collapseToEnd(); // so the new color is visible instead of the selection tint
+      store.markDirty();
+    };
+    const later = (ms: number) => { clearTimeout(timer); timer = window.setTimeout(() => { if (!down) apply(); }, ms); };
+    const pd = (e: PointerEvent) => { if ((e.target as Element).closest('#editor')) down = true; };
+    const pu = () => { down = false; later(40); };
+    const sc = () => later(350); // touch selection handles and Shift+arrow selections
+    document.addEventListener('pointerdown', pd);
+    document.addEventListener('pointerup', pu);
+    document.addEventListener('selectionchange', sc);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('pointerdown', pd);
+      document.removeEventListener('pointerup', pu);
+      document.removeEventListener('selectionchange', sc);
+    };
+  }, [hlOn, hlColor]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hasTextSelection = () => {
+    const s = getSelection(), r = editorRef.current && s && s.rangeCount && editorRef.current.contains(s.anchorNode) ? s.getRangeAt(0) : getSaved();
+    return !!r && !r.collapsed;
+  };
+  const onHlButton = () => {
+    if (hlOn) { setHlOn(false); return; }                              // on -> off
+    if (hasTextSelection()) { doCmd('hiliteColor', hlColor); return; } // text selected -> highlight it now
+    setHlOn(true); setToolState(null);                                 // nothing selected -> pen on
+  };
+  const onHlColor = (c: string) => {
+    setHlColor(c);
+    if (hasTextSelection() && !hlOn) doCmd('hiliteColor', c);
+    else setHlOn(true);
+  };
   const closeMenu = useCallback(() => setMenu(null), []);
   const openMenu = (m: Menu, anchor: Element | null = null) => setMenu({ m, anchor });
   const ed = () => editorRef.current!;
@@ -246,8 +291,7 @@ export default function App() {
       const F = fns.current, S = L.current, t = e.target as HTMLElement;
       if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel && !t.isContentEditable && !/INPUT|SELECT/.test(t.tagName)) F.deleteShape(S.sel);
       if (S.tool && (e.ctrlKey || e.metaKey) && e.code === 'KeyZ') { e.preventDefault(); F.penUndo(); }
-      if (e.key === 'Escape') { F.closeMenu(); if (S.tool) setToolState(null); }
-      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyC' || e.code === 'KeyF')) {
+if (e.key === 'Escape') { F.closeMenu(); setHlOn(false); if (S.tool) setToolState(null); }      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyC' || e.code === 'KeyF')) {
         e.preventDefault();
         if (e.code === 'KeyC' && S.sel) { F.openMenu({ k: 'shape' }, F.shapeEl()); return; }
         if (!getSaved()) return;
@@ -318,8 +362,8 @@ export default function App() {
         onTheme={() => { const t = dark ? 'light' : 'dark'; setTheme(t); try { localStorage.setItem('db-theme', t); } catch { /* ignore */ } }}
         onPrint={() => { flushSync(() => setSel(null)); window.print(); }} />
       <Toolbar hasSel={!!selShape} sfValue={sfValue} tool={tool} penColor={penColor} penWidth={penWidth}
-        onCmd={(c) => doCmd(c)} onFont={(f) => doCmd('fontName', f)} onSize={doSize} onFg={(c) => doCmd('foreColor', c)} onHighlight={(c) => doCmd('hiliteColor', c)}
-        onTool={(t) => { const next = tool === t ? null : t; setToolState(next); if (next) { setSel(null); setMenu(null); } }}
+        onCmd={(c) => doCmd(c)} onFont={(f) => doCmd('fontName', f)} onSize={doSize} onFg={(c) => doCmd('foreColor', c)} hlOn={hlOn} hlColor={hlColor} onHlButton={onHlButton} onHlColor={onHlColor}
+        onTool={(t) => { const next = tool === t ? null : t; setToolState(next); if (next) { setSel(null); setMenu(null); setHlOn(false); } }}
         onPenColor={setPenColor} onPenWidth={setPenWidth}
         onShape={(k) => (k === 'arrow' ? addArrow() : addBox(k))} onShapeFill={fillShape}
         onFront={() => selShape && store.setScene((sc) => ({ ...sc, shapes: [...sc.shapes.filter((s) => s.id !== selShape.id), selShape] }))}
