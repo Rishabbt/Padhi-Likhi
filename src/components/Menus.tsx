@@ -39,7 +39,12 @@ export function ColorMenu(p: { onFg: (c: string) => void; onBg: (c: string) => v
 }
 
 export const HL_COLORS: [string, string][] = [
-  ['#fff3a3', 'Yellow'], ['#b8f5c4', 'Green'], ['#ffc9de', 'Pink'], ['#bfe3ff', 'Blue'], ['#ffd9a8', 'Orange'], ['#e3ccff', 'Purple'],
+  ['#A78BFA', 'Purple'],
+  ['#4ADE80', 'Green'],
+  ['#F472B6', 'Pink'],
+  ['#60A5FA', 'Blue'],
+  ['#FF0000', 'Red'],
+  ['#FBBF24', 'Yellow'],
 ];
 export function HlMenu({ color, onPick }: { color: string; onPick: (c: string) => void }) {
   return (

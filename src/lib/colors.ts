@@ -1,4 +1,8 @@
-export const FG = ['#1b1b1b', '#c0392b', '#e67e22', '#27ae60', '#2980b9', '#8e44ad', '#7f8c8d', '#ffffff'];
+export const FG =  ['#A78BFA',
+  '#4ADE80', 
+  '#F472B6', 
+  '#60A5FA', 
+  '#FBBF24' ];
 export const BG = ['#fff3a3', '#ffd6d6', '#ffe0b3', '#d6f5e0', '#cfe8ff', '#ead6ff', '#e0e0e0', 'transparent'];
 export const SOL = ['#dbeafe', '#fecaca', '#fde68a', '#bbf7d0', '#e9d5ff', '#fbcfe8', '#ffffff', '#1d4ed8', '#1b1b1b'];
 export const GR: [string, string][] = [
