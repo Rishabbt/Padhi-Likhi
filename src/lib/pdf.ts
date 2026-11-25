@@ -91,6 +91,9 @@ function buildPDF({ page: pe, editor: ed, layer, shapes, strokes, name }: PdfInp
   function words(root: Element) {
     const wk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), rg = document.createRange();
     let nd: Node | null;
+    // the last highlight box drawn, so the next word on the same line can extend it across the space
+    type HlBox = { i: number; idx: number; c: RGB; x: number; y: number; w: number; h: number };
+    let lastHl = null as HlBox | null;
     while ((nd = wk.nextNode())) {
       const el = nd.parentElement;
       if (!el || el.closest('.xd,.rh,script,style')) continue;
@@ -115,7 +118,7 @@ function buildPDF({ page: pe, editor: ed, layer, shapes, strokes, name }: PdfInp
         }
       }
       cx.font = (ital ? 'italic ' : '') + (bold ? 'bold ' : '') + fs + 'px ' + CF[fm];
-const val = nd.nodeValue || '', re = /[^\s\u200b]+/g;
+      const val = nd.nodeValue || '', re = /[^\s\u200b]+/g;
       let m: RegExpExecArray | null;
       while ((m = re.exec(val))) {
         rg.setStart(nd, m.index);
@@ -124,7 +127,18 @@ const val = nd.nodeValue || '', re = /[^\s\u200b]+/g;
         if (!rc || !rc.width) continue;
         const r = rel(rc), i = pgOf(r.y), w = m[0];
         const pw = cx.measureText(w).width, tz = pw > 0 ? Math.max(60, Math.min(140, (r.w / pw) * 100)) : 100, base = r.y + r.h * 0.8;
-        if (hl) pg[i].push('q ' + f3(hl) + ' rg ' + pth(rectOps(r.x, r.y, r.w, r.h), i) + ' f Q');
+        if (hl) {
+          const L: HlBox | null = lastHl;
+          const gap = L ? r.x - (L.x + L.w) : 0;
+          if (L && L.i === i && L.c.join() === hl.join() && Math.abs(L.y - r.y) < 2 && gap > -1 && gap < fs * 0.8) {
+            // same highlight, same line: stretch the previous box to cover the space and this word
+            L.w = r.x + r.w - L.x;
+            pg[i][L.idx] = 'q ' + f3(hl) + ' rg ' + pth(rectOps(L.x, L.y, L.w, L.h), i) + ' f Q';
+          } else {
+            pg[i].push('q ' + f3(hl) + ' rg ' + pth(rectOps(r.x, r.y, r.w, r.h), i) + ' f Q');
+            lastHl = { i, idx: pg[i].length - 1, c: hl, x: r.x, y: r.y, w: r.w, h: r.h };
+          }
+        } else lastHl = null;
         pg[i].push('BT /F' + (fi + 1) + ' ' + (fs * K).toFixed(2) + ' Tf ' + tz.toFixed(1) + ' Tz ' + f3(col) + ' rg 1 0 0 1 ' + cv(r.x, base, i) + ' Tm (' + penc(w) + ') Tj ET');
         if (ul) pg[i].push('q ' + f3(col) + ' RG .6 w ' + cv(r.x, base + fs * 0.1, i) + ' m ' + cv(r.x + r.w, base + fs * 0.1, i) + ' l S Q');
       }
